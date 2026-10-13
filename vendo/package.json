@@ -1,0 +1,20 @@
+{
+  "name": "vendo-mvp",
+  "version": "0.1.0",
+  "description": "Vendo MVP – automaten-app (PWA) en dashboard voor KdG",
+  "scripts": {
+    "build:css": "tailwindcss -i shared/input.css -o shared/vendo.css --minify",
+    "watch:css": "tailwindcss -i shared/input.css -o shared/vendo.css --watch",
+    "start": "npx --yes serve -l 8080 ."
+  },
+  "author": "Team Error 707",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  },
+  "dependencies": {
+    "@fontsource/plus-jakarta-sans": "^5.0.20",
+    "@fortawesome/fontawesome-free": "^6.5.2"
+  },
+  "private": true
+}

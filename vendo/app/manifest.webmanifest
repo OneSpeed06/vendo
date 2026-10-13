@@ -1,0 +1,18 @@
+{
+  "name": "Vendo – KdG automaten",
+  "short_name": "Vendo",
+  "description": "Vind een werkende automaat met jouw snack of drankje op je KdG-campus, reserveer en meld storingen.",
+  "lang": "nl-BE",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0f19",
+  "theme_color": "#131b2e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

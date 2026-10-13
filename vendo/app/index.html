@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="nl" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Vendo – KdG automaten</title>
+  <meta name="description" content="Vind op je KdG-campus een werkende automaat met jouw snack of drankje, reserveer het en meld storingen.">
+  <meta name="theme-color" content="#131b2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vendo">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="../shared/assets/fonts/fonts.css">
+  <link rel="stylesheet" href="../shared/assets/fa/css/all.min.css">
+  <link rel="stylesheet" href="../shared/vendo.css">
+</head>
+<body class="antialiased">
+  <!-- De volledige app wordt door app.js in #app getekend -->
+  <div id="app" class="relative mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-bg sm:border-x sm:border-line sm:shadow-2xl">
+    <noscript><p class="p-6">Vendo heeft JavaScript nodig.</p></noscript>
+  </div>
+
+  <script src="../shared/store.js"></script>
+  <script src="../shared/ui.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
