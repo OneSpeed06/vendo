@@ -26,6 +26,8 @@
     navOpen: false,
     productPrefill: '',
     refillAll: false,
+    mapMode: 'view',   // 'view' | 'move' | 'add'
+    draft: null,       // {x, y} voor een nieuwe automaat
   };
 
   const PAGES = [
@@ -283,6 +285,20 @@
             ${[['Vulgraad', s.fill + '%'], ['Lege vakken', V.derive.emptySlots(m)], ['Reservaties', activeRes.length], ['Bijgevuld', timeAgo(m.lastRefill)]].map(([l, v]) => `<div class="rounded-xl border border-line bg-sub p-2.5"><p class="text-[10px] font-bold uppercase text-muted">${l}</p><p class="text-sm font-extrabold">${v}</p></div>`).join('')}
           </div>
 
+          <details class="rounded-xl border border-line bg-sub/50 p-3" ${m.slots.length ? '' : 'open'}>
+            <summary class="cursor-pointer text-xs font-bold"><i class="fa-solid fa-pen mr-1 text-brand-500"></i>Gegevens & plaats</summary>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+              <div class="sm:col-span-2"><label class="label" for="mLoc">Locatie</label><input id="mLoc" class="field py-1.5 text-xs" maxlength="80" value="${esc(m.location)}"></div>
+              <div><label class="label" for="mType">Type</label><select id="mType" class="field py-1.5 text-xs">${Object.entries(V.MACHINE_TYPES).map(([k, v]) => `<option value="${k}" ${k === m.type ? 'selected' : ''}>${v.icon} ${v.label}</option>`).join('')}</select></div>
+              <div><label class="label" for="mFloor">Verdiep</label><select id="mFloor" class="field py-1.5 text-xs">${V.get.campus(m.campusId).floors.map((f) => `<option value="${f.id}" ${f.id === m.floor ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></div>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button onclick="Dash.saveMachineInfo('${m.id}')" class="btn-primary px-3 py-1.5 text-xs">Opslaan</button>
+              <button onclick="Dash.showOnMap('${m.id}')" class="btn-ghost px-3 py-1.5 text-xs"><i class="fa-solid fa-map-location-dot"></i> Op kaart</button>
+              <button onclick="Dash.removeMachine('${m.id}')" class="btn-ghost ml-auto px-3 py-1.5 text-xs text-rose-500"><i class="fa-solid fa-trash"></i> Verwijderen</button>
+            </div>
+          </details>
+
           <div>
             <p class="label">Status van de automaat</p>
             <div class="grid grid-cols-2 gap-2">
@@ -484,7 +500,7 @@
             <tbody class="divide-y divide-line">
             ${list.map((p) => { const st = V.derive.productStats(p.id); const pct = st.capacity ? Math.round((st.stock / st.capacity) * 100) : 0;
               return `<tr>
-                <td class="p-3"><p class="font-bold">${p.icon} ${esc(p.name)}</p><p class="text-[10px] text-muted">${p.tags.map((t) => V.TAGS[t]?.label || t).join(' · ')}</p></td>
+                <td class="p-3"><p class="font-bold">${p.icon} ${esc(p.name)}</p></td>
                 <td class="p-3 text-xs">${V.CATEGORIES[p.category]?.label}</td>
                 <td class="p-3"><div class="relative w-24"><span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted">€</span><input aria-label="Prijs ${esc(p.name)}" class="field py-1.5 pl-6 text-xs" inputmode="decimal" value="${(p.price / 100).toFixed(2).replace('.', ',')}" onchange="Dash.price('${p.id}', this.value)"></div></td>
                 <td class="p-3 text-center text-xs font-bold">${st.machines}</td>
@@ -502,9 +518,6 @@
             <div><label class="label" for="pCat">Categorie</label><select id="pCat" class="field text-sm">${Object.entries(V.CATEGORIES).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}</select></div>
             <div><label class="label" for="pPrice">Prijs (€)</label><input id="pPrice" inputmode="decimal" class="field text-sm" placeholder="1,80"></div>
           </div>
-          <fieldset><legend class="label">Labels</legend><div class="flex flex-wrap gap-1.5">
-            ${Object.entries(V.TAGS).map(([k, v]) => `<label class="chip cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:bg-brand-500/15"><input type="checkbox" name="tags" value="${k}" class="accent-brand-500"> ${v.icon} ${v.label}</label>`).join('')}
-          </div></fieldset>
           <button class="btn-primary w-full py-2.5 text-sm" type="submit">Product toevoegen</button>
           <p class="text-[11px] text-muted">Daarna kan je het product in een vak plaatsen via <b>Automaten → Beheer</b>.</p>
         </form>
@@ -512,8 +525,7 @@
     ui.productPrefill = '';
     $('#productForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      const tags = [...document.querySelectorAll('input[name="tags"]:checked')].map((x) => x.value);
-      const r = V.actions.saveProduct({ name: $('#pName').value, icon: $('#pIcon').value.trim(), category: $('#pCat').value, price: $('#pPrice').value, tags });
+      const r = V.actions.saveProduct({ name: $('#pName').value, icon: $('#pIcon').value.trim(), category: $('#pCat').value, price: $('#pPrice').value, tags: [] });
       U.toast(r.ok ? 'Product toegevoegd' : r.error, r.ok ? 'ok' : 'error');
     });
   }
@@ -527,15 +539,30 @@
     if (!campus.floors.some((f) => f.id === ui.mapFloor)) ui.mapFloor = campus.floors.some((f) => f.id === 0) ? 0 : campus.floors[0].id;
     const ms = V.get.machinesOfCampus(campus.id);
     const onFloor = ms.filter((m) => m.floor === ui.mapFloor);
+    const modes = [
+      ['view', 'fa-eye', 'Bekijken', 'Klik op een automaat om hem te beheren.'],
+      ['move', 'fa-up-down-left-right', 'Verplaatsen', 'Sleep een automaat naar zijn juiste plek. De app past zich meteen aan.'],
+      ['add', 'fa-plus', 'Automaat toevoegen', 'Klik op de plek waar de nieuwe automaat staat en vul de gegevens in.'],
+    ];
+    const hint = modes.find((x) => x[0] === ui.mapMode)[3];
+    const draft = ui.mapMode === 'add' && ui.draft && ui.draft.floor === ui.mapFloor ? ui.draft : null;
+
     $('#page').innerHTML = `
-      <div class="mb-4 flex flex-wrap items-center gap-2">
-        ${ui.campus === 'all' && S().campuses.length > 1 ? S().campuses.map((c) => `<button onclick="Dash.mapCampus('${c.id}')" class="chip ${ui.mapCampus === c.id ? 'chip-active' : ''}">${esc(c.short)}</button>`).join('') + '<span class="mx-1 h-5 w-px bg-line"></span>' : ''}
-        ${campus.floors.map((f) => { const n = ms.filter((m) => m.floor === f.id); const bad = n.filter((m) => V.derive.machineState(m).key !== 'ok').length;
-          return `<button onclick="Dash.mapFloor(${f.id})" class="chip ${ui.mapFloor === f.id ? 'chip-active' : ''}">${esc(f.name)} <span class="opacity-70">${n.length}</span>${bad ? '<span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>' : ''}</button>`; }).join('')}
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="no-scrollbar flex flex-wrap items-center gap-2">
+          ${ui.campus === 'all' && S().campuses.length > 1 ? S().campuses.map((c) => `<button onclick="Dash.mapCampus('${c.id}')" class="chip ${ui.mapCampus === c.id ? 'chip-active' : ''}">${esc(c.short)}</button>`).join('') + '<span class="mx-1 h-5 w-px bg-line"></span>' : ''}
+          ${campus.floors.map((f) => { const n = ms.filter((m) => m.floor === f.id); const bad = n.filter((m) => V.derive.machineState(m).key !== 'ok').length;
+            return `<button onclick="Dash.mapFloor(${f.id})" class="chip ${ui.mapFloor === f.id ? 'chip-active' : ''}">${esc(f.name)} <span class="opacity-70">${n.length}</span>${bad ? '<span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>' : ''}</button>`; }).join('')}
+        </div>
+        <div class="flex rounded-xl border border-line bg-sub p-0.5 text-xs font-bold" role="radiogroup" aria-label="Kaartmodus">
+          ${modes.map(([id, icon, label]) => `<button role="radio" aria-checked="${ui.mapMode === id}" onclick="Dash.setMapMode('${id}')" class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${ui.mapMode === id ? 'bg-brand-500 text-white' : 'text-muted hover:text-ink'}"><i class="fa-solid ${icon}"></i>${label}</button>`).join('')}
+        </div>
       </div>
+      <p class="mb-3 flex items-center gap-2 rounded-xl border ${ui.mapMode === 'view' ? 'border-line bg-card text-muted' : 'border-brand-500/40 bg-brand-500/10 text-brand-700 dark:text-brand-300'} px-3 py-2 text-xs font-semibold"><i class="fa-solid fa-circle-info"></i>${hint}</p>
       <div class="grid gap-6 xl:grid-cols-3 [&>*]:min-w-0">
         <div class="xl:col-span-2"><div id="plan" class="mx-auto max-w-3xl"></div></div>
         <div class="space-y-2">
+          ${draft ? addMachineForm(campus, draft) : ''}
           <h2 class="label">${esc(campus.name)} · ${esc(V.get.floorName(campus.id, ui.mapFloor))}</h2>
           ${onFloor.length ? onFloor.map((m) => { const s = V.derive.machineState(m);
             return `<button onclick="Dash.openMachine('${m.id}')" class="card flex w-full items-center justify-between gap-3 p-3 text-left hover:border-brand-500/50">
@@ -544,7 +571,80 @@
             : '<p class="card p-4 text-sm text-muted">Geen automaten op dit verdiep.</p>'}
         </div>
       </div>`;
-    U.renderFloorplan($('#plan'), { campusId: campus.id, floor: ui.mapFloor, machines: onFloor, selectedId: ui.drawer, onPin: (id) => openMachine(id) });
+
+    U.renderFloorplan($('#plan'), {
+      campusId: campus.id, floor: ui.mapFloor, machines: onFloor, selectedId: ui.drawer, draft,
+      draggable: ui.mapMode === 'move',
+      onPin: (id) => { if (ui.mapMode !== 'move') openMachine(id); },
+      onBackground: ui.mapMode === 'add' ? (x, y) => { ui.draft = { x, y, floor: ui.mapFloor }; render(); setTimeout(() => $('#newLoc')?.focus(), 0); } : null,
+    });
+    if (ui.mapMode === 'move') enableDrag($('#plan'));
+    if (draft) wireAddForm(campus, draft);
+  }
+
+  function addMachineForm(campus, draft) {
+    return `<form id="addMachineForm" class="card space-y-3 border-brand-500/50 p-4">
+      <h3 class="font-extrabold"><i class="fa-solid fa-plus mr-1 text-brand-500"></i>Nieuwe automaat</h3>
+      <p class="text-[11px] text-muted">${esc(V.get.floorName(campus.id, draft.floor))} · positie ${draft.x}% / ${draft.y}% (klik opnieuw op de kaart om te verschuiven)</p>
+      <div><label class="label" for="newType">Type</label>
+        <select id="newType" class="field py-2 text-sm">${Object.entries(V.MACHINE_TYPES).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}</select></div>
+      <div><label class="label" for="newLoc">Locatie (zoals studenten ze zien)</label>
+        <input id="newLoc" class="field py-2 text-sm" maxlength="80" placeholder="Bv. Gang bij lokaal 204"></div>
+      <div><label class="label" for="newCode">Code</label>
+        <input id="newCode" class="field py-2 text-sm" maxlength="12" placeholder="${esc(nextCodeHint(campus.id, draft.floor))} (automatisch)"></div>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" onclick="Dash.cancelDraft()" class="btn-ghost py-2 text-xs">Annuleer</button>
+        <button type="submit" class="btn-primary py-2 text-xs">Toevoegen</button>
+      </div>
+      <p class="text-[11px] text-muted">Daarna open je de automaat om vakken en producten toe te voegen.</p>
+    </form>`;
+  }
+  function nextCodeHint(campusId, floor) {
+    const prefix = 'K' + (V.get.campus(campusId).short || campusId)[0].toUpperCase();
+    const fl = floor === 0.5 ? 'M' : String(Math.max(0, Math.floor(floor)));
+    let n = 1; while (S().machines.some((m) => m.code === `${prefix}.${fl}${n}`)) n++;
+    return `${prefix}.${fl}${n}`;
+  }
+  function wireAddForm(campus, draft) {
+    $('#addMachineForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const r = V.actions.addMachine({ campusId: campus.id, floor: draft.floor, x: draft.x, y: draft.y, type: $('#newType').value, location: $('#newLoc').value, code: $('#newCode').value });
+      if (!r.ok) return U.toast(r.error, 'error');
+      ui.draft = null; ui.mapMode = 'view';
+      U.toast(`${r.machine.code} toegevoegd. Voeg nu vakken toe.`);
+      openMachine(r.machine.id);
+    });
+  }
+
+  /** Pins verslepen op de plattegrond (muis en touch) */
+  function enableDrag(container) {
+    const plan = container.querySelector('[data-plan]');
+    container.querySelectorAll('[data-pin]').forEach((pin) => {
+      pin.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        pin.setPointerCapture(e.pointerId);
+        const rect = plan.getBoundingClientRect();
+        let x = null, y = null;
+        const move = (ev) => {
+          x = Math.max(2, Math.min(98, ((ev.clientX - rect.left) / rect.width) * 100));
+          y = Math.max(2, Math.min(98, ((ev.clientY - rect.top) / rect.height) * 100));
+          pin.style.left = x + '%'; pin.style.top = y + '%'; pin.style.zIndex = 30;
+        };
+        const up = () => {
+          pin.removeEventListener('pointermove', move);
+          pin.removeEventListener('pointerup', up);
+          pin.removeEventListener('pointercancel', up);
+          if (x !== null) {
+            const m = V.get.machine(pin.dataset.pin);
+            V.actions.moveMachine(m.id, x, y);
+            U.toast(`${m.code} verplaatst`);
+          }
+        };
+        pin.addEventListener('pointermove', move);
+        pin.addEventListener('pointerup', up);
+        pin.addEventListener('pointercancel', up);
+      });
+    });
   }
 
   // =====================================================================
@@ -601,6 +701,22 @@
     price(id, val) { const p = V.get.product(id); res(V.actions.saveProduct({ ...p, price: val }), 'Prijs aangepast'); },
     mapCampus(c) { ui.mapCampus = c; ui.mapFloor = null; render(); },
     mapFloor(f) { ui.mapFloor = f; render(); },
+    setMapMode(m) { ui.mapMode = m; if (m !== 'add') ui.draft = null; render(); },
+    cancelDraft() { ui.draft = null; render(); },
+    saveMachineInfo(id) {
+      const floor = Number($('#mFloor').value);
+      const r = V.actions.updateMachine(id, { location: $('#mLoc').value, type: $('#mType').value });
+      if (!r.ok) return U.toast(r.error, 'error');
+      const m = V.get.machine(id);
+      if (floor !== m.floor) { V.actions.moveMachine(id, m.x, m.y, floor); U.toast(`${m.code} staat nu op ${V.get.floorName(m.campusId, floor)}. Zet hem juist via Kaart → Verplaatsen.`, 'info'); }
+      else U.toast('Gegevens opgeslagen');
+    },
+    removeMachine(id) {
+      if (this._rmArmed !== id) { this._rmArmed = id; setTimeout(() => { if (this._rmArmed === id) this._rmArmed = null; }, 3000); return U.toast('Klik nog eens om deze automaat te verwijderen', 'info'); }
+      this._rmArmed = null; const code = V.get.machine(id).code;
+      V.actions.removeMachine(id); ui.drawer = null; render(); U.toast(`${code} verwijderd`);
+    },
+    showOnMap(id) { const m = V.get.machine(id); ui.mapCampus = m.campusId; ui.mapFloor = m.floor; ui.drawer = null; location.hash = '#kaart'; if (ui.page === 'kaart') render(); },
     simulate() { const r = V.actions.simulateSales(5); U.toast(`${r.sold} verkopen gesimuleerd`, 'info'); },
     reset() {
       if (!this._armed) { this._armed = true; setTimeout(() => { this._armed = false; }, 3000); return U.toast('Klik nog eens om alle demodata te resetten', 'info'); }

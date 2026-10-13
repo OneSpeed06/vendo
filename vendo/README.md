@@ -46,14 +46,15 @@ Zet de map online, bijvoorbeeld met GitHub Pages (Settings → Pages → branch 
 
 **App (studenten & personeel)**
 - **Favorieten:** markeer producten met ☆. Ze staan bovenaan bij Ontdek, samen met hoeveel er nog beschikbaar zijn op de campus.
-- Zoeken op product, categorie of label (bv. "red bull", "chips", "vegan"). Je ziet direct welke automaten het **op voorraad** hebben, de dichtstbijzijnde eerst.
-- Filters: drank, snacks of koffie, suikervrij, vegan, glutenvrij, en "enkel werkend".
+- Zoeken op product of categorie (bv. "red bull", "chips", "koffie"). Je ziet direct welke automaten het **op voorraad** hebben, de dichtstbijzijnde eerst.
+- Filter op drank, snacks of koffie. Met de schakelaar **Enkel werkende** verberg je defecte automaten.
+- Knop **Op kaart** bij elke automaat: springt naar het juiste verdiep en duidt de automaat aan.
 - **Dichtstbij:** je stelt je eigen locatie in (verdiep + plek op de kaart). De app schat dan de loopafstand ("1 verdiep hoger · ~40 m · 1 min").
 - **Kaart** per verdiep met pins in een statuskleur: werkt, bijna leeg, storing gemeld of defect.
 - Elke automaat toont welke producten erin zitten met de **voorraad per product** ernaast. Vulgraad-percentages zie je enkel in het dashboard van de vulploeg.
 - Detail van een automaat: inhoud, prijzen, voorraad per vak en wanneer hij laatst bijgevuld werd.
 - **Reserveren / online bestellen:** het product wordt **8 uur** opzijgelegd en je krijgt een ophaalcode met afteltimer. Kies "betalen aan de automaat" of "nu online betalen" (demo). Ophalen simuleer je door de code in te tikken, daarna gaat de voorraad met 1 omlaag. Je kan maximaal 2 actieve reservaties tegelijk hebben.
-- **Annulatiekost € 0,50:** annuleer je zelf of haal je niet op binnen 8 uur, dan betaal je € 0,50, want het product lag opzij. Was het al online betaald, dan krijg je de rest terug. Annuleert de vulploeg (bv. automaat defect), dan betaal je niets.
+- **Annulatiekost € 0,50:** annuleren is **gratis tijdens de eerste 15 minuten**. Annuleer je later of haal je niet op binnen 8 uur, dan betaal je € 0,50, want het product lag opzij. Was het al online betaald, dan krijg je de rest terug. Annuleert de vulploeg (bv. automaat defect), dan betaal je niets.
 - **Storing melden** met type probleem en een toelichting.
 - **Product voorstellen** en **stemmen** op ideeën. Bestaat een idee al, dan wordt je stem erbij geteld.
 - **Meldingen** (belletje) wanneer je melding opgelost is, je reservatie verloopt of je idee gepland is.
@@ -67,7 +68,7 @@ Zet de map online, bijvoorbeeld met GitHub Pages (Settings → Pages → branch 
 - Reservaties opvolgen of annuleren.
 - Productideeën gesorteerd op stemmen. Pas je de status aan, dan krijgen de stemmers een bericht. Met "Als product" maak je er meteen een product van.
 - Productcatalogus: prijzen aanpassen en nieuwe producten toevoegen.
-- Kaart per campus en verdiep.
+- Kaart per campus en verdiep, met een **bewerkmodus**: automaten verslepen naar hun juiste plek en nieuwe automaten toevoegen door op de kaart te klikken. Per automaat pas je ook locatie, type en verdiep aan, of verwijder je hem.
 - Demo-tools: verkopen simuleren en de demodata resetten.
 
 ## Hoe het werkt (zonder backend)

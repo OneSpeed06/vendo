@@ -119,7 +119,7 @@
       const isDim = dim.has(m.id);
       return `
       <button type="button" data-pin="${m.id}" aria-label="Automaat ${esc(m.code)}, ${st.label}"
-        class="group absolute z-10 -translate-x-1/2 -translate-y-1/2 focus:outline-none ${isDim ? 'opacity-30 grayscale' : ''}" style="left:${m.x}%;top:${m.y}%">
+        class="group absolute z-10 -translate-x-1/2 -translate-y-1/2 focus:outline-none ${opts.draggable ? 'cursor-grab touch-none active:cursor-grabbing' : ''} ${isDim ? 'opacity-30 grayscale' : ''}" style="left:${m.x}%;top:${m.y}%">
         <span class="relative flex flex-col items-center">
           ${isSel ? '<span class="absolute -inset-1.5 rounded-full border-2 border-brand-500 animate-ping opacity-60"></span>' : ''}
           <span class="flex ${pinSize} items-center justify-center rounded-full border-2 ${tone(st.color).ring} shadow-lg transition-transform group-hover:scale-110 ${isSel ? 'scale-125 ring-4 ring-brand-500/40' : ''}">${V.MACHINE_TYPES[m.type].icon}</span>
@@ -134,6 +134,13 @@
         <div class="absolute left-1/2 top-4 -translate-x-1/2 whitespace-nowrap rounded bg-blue-500 px-1.5 text-[9px] font-bold text-white">Jij</div>
       </div>` : '';
 
+    // voorlopige pin (bv. nieuwe automaat in het dashboard)
+    const draft = opts.draft ? `
+      <div class="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2" style="left:${opts.draft.x}%;top:${opts.draft.y}%">
+        <span class="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-brand-500 bg-brand-500/25 text-xs font-bold text-brand-600 dark:text-brand-400 shadow-lg"><i class="fa-solid fa-plus"></i></span>
+        <span class="absolute left-1/2 top-9 -translate-x-1/2 whitespace-nowrap rounded bg-brand-500 px-1.5 text-[9px] font-bold text-white">Nieuw</span>
+      </div>` : '';
+
     const legend = opts.showLegend === false ? '' : `
         <div class="pointer-events-none mt-1.5 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] font-semibold text-muted">
           <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>Werkt</span>
@@ -146,7 +153,7 @@
       <div data-scroller class="${wide ? 'overflow-x-auto rounded-2xl' : ''}">
       <div data-plan class="relative ${wide ? 'min-w-[640px]' : ''} w-full overflow-hidden rounded-2xl border-2 border-line bg-sub ${opts.onBackground ? 'cursor-crosshair' : ''}" style="aspect-ratio:${floor.aspect || '4 / 3'}">
         ${floor.image ? '' : `<svg class="pointer-events-none absolute inset-0 h-full w-full text-muted opacity-20" aria-hidden="true"><defs><pattern id="grid-${opts.campusId}" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="currentColor" stroke-width=".5"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid-${opts.campusId})"/></svg>`}
-        ${zones}${pins}${me}
+        ${zones}${pins}${me}${draft}
       </div></div>${legend}`;
 
     // brede plattegrond op gsm: scroll naar de geselecteerde automaat of naar "jij"

@@ -16,13 +16,14 @@
   'use strict';
 
   const STORAGE_KEY = 'vendo.mvp.data';
-  const DATA_VERSION = 4;
+  const DATA_VERSION = 5;
   const SESSION_KEYS = { app: 'vendo.session.app', dashboard: 'vendo.session.dashboard' };
 
   // ---------- Instellingen ----------
   const CONFIG = {
     reservationMinutes: 8 * 60, // hoe lang een reservatie geldig blijft (8 uur)
     cancelFee: 50,            // annulatiekost in cent (product werd opzijgelegd)
+    freeCancelMinutes: 15,    // binnen deze tijd na reserveren is annuleren gratis
     maxActiveReservations: 2, // per gebruiker tegelijk
     lowFillPercent: 30,       // onder deze vulgraad = "bijna leeg"
     lowSlotQty: 2,            // vak met <= 2 stuks = "bijna op"
@@ -301,7 +302,7 @@
       const c = get.campus(campusId); const f = c && c.floors.find((x) => x.id === floorId);
       return f ? f.name : 'Verdiep ' + floorId;
     },
-    machinesOfCampus: (campusId) => state.machines.filter((m) => !campusId || campusId === 'all' || m.campusId === campusId),
+    machinesOfCampus: (campusId) => state.machines.filter((m) => !m.removed).filter((m) => !campusId || campusId === 'all' || m.campusId === campusId),
     openReports: (machineId) => state.reports.filter((r) => r.machineId === machineId && r.status !== 'opgelost'),
   };
 
@@ -365,7 +366,7 @@
 
   function productStats(productId) {
     let machines = 0, stock = 0, capacity = 0;
-    state.machines.forEach((m) => m.slots.forEach((s) => {
+    state.machines.filter((m) => !m.removed).forEach((m) => m.slots.forEach((s) => {
       if (s.productId === productId) { machines++; stock += s.qty; capacity += s.capacity; }
     }));
     return { machines, stock, capacity };
@@ -460,13 +461,18 @@
     return { ok: true, reservation: res };
   }
 
+  /** Annuleren is gratis zolang de reservatie jonger is dan CONFIG.freeCancelMinutes */
+  function freeCancelUntil(r) { return r.createdAt + CONFIG.freeCancelMinutes * 60000; }
+  function isFreeCancel(r, now = Date.now()) { return now < freeCancelUntil(r); }
+
   function cancelReservation(id, byUserId) {
     const r = state.reservations.find((x) => x.id === id);
     if (!r || r.status !== 'actief') return { ok: false, error: 'Deze reservatie is niet meer actief.' };
     if (byUserId && r.userId !== byUserId) return { ok: false, error: 'Niet jouw reservatie.' };
     r.status = 'geannuleerd'; r.closedAt = Date.now();
-    // Gebruiker annuleert zelf → product lag opzij → annulatiekost. Annuleert de vulploeg: gratis.
-    r.fee = byUserId ? CONFIG.cancelFee : 0;
+    // Gebruiker annuleert zelf → product lag opzij → annulatiekost,
+    // behalve binnen de eerste 15 minuten. Annuleert de vulploeg: altijd gratis.
+    r.fee = byUserId && !isFreeCancel(r) ? CONFIG.cancelFee : 0;
     const refund = r.paid ? r.price - r.fee : 0;
     log('↩️', `Reservatie ${r.code} geannuleerd${byUserId ? ` door gebruiker (kost ${euro(r.fee)})` : ' door vulploeg'}${r.paid ? ` · terugbetaald ${euro(refund)}` : ''}`);
     if (!byUserId) notify(r.userId, '↩️', `De vulploeg heeft je reservatie ${r.code} geannuleerd${r.paid ? ' en volledig terugbetaald' : ''}. Er wordt geen kost aangerekend.`);
@@ -617,9 +623,71 @@
     return { ok: true };
   }
 
+  // ---------- Automaten beheren (vulploeg) ----------
+  function nextMachineCode(campusId, floor) {
+    const campus = get.campus(campusId);
+    const prefix = 'K' + (campus?.short || campusId)[0].toUpperCase(); // bv. KG
+    const fl = floor === 0.5 ? 'M' : String(Math.max(0, Math.floor(floor)));
+    let n = 1, code;
+    do { code = `${prefix}.${fl}${n}`; n++; } while (state.machines.some((m) => m.code === code));
+    return code;
+  }
+
+  function addMachine(data) {
+    const campus = get.campus(data.campusId);
+    if (!campus || !campus.floors.some((f) => f.id === data.floor)) return { ok: false, error: 'Kies een geldig verdiep.' };
+    if (!MACHINE_TYPES[data.type]) return { ok: false, error: 'Kies een type automaat.' };
+    const location = String(data.location || '').trim();
+    if (location.length < 2) return { ok: false, error: 'Geef een korte locatie op (bv. "Gang bij lokaal 204").' };
+    const code = String(data.code || '').trim() || nextMachineCode(data.campusId, data.floor);
+    if (state.machines.some((m) => m.code === code)) return { ok: false, error: `Code ${code} bestaat al.` };
+    const id = code.replace(/[^A-Za-z0-9]/g, '') + '-' + Date.now().toString(36).slice(-4);
+    const clamp = (v) => Math.max(2, Math.min(98, Math.round(v)));
+    const machine = { id, code, campusId: data.campusId, floor: data.floor, location: location.slice(0, 80), type: data.type, x: clamp(data.x), y: clamp(data.y), status: 'ok', slots: [], lastRefill: Date.now() };
+    state.machines.push(machine);
+    log('➕', `Nieuwe automaat ${code} op ${get.floorName(data.campusId, data.floor)} (${location})`);
+    commit();
+    return { ok: true, machine };
+  }
+
+  function moveMachine(machineId, x, y, floor) {
+    const m = get.machine(machineId);
+    if (!m) return { ok: false };
+    const clamp = (v) => Math.max(2, Math.min(98, Math.round(v)));
+    m.x = clamp(x); m.y = clamp(y);
+    if (floor !== undefined && get.campus(m.campusId).floors.some((f) => f.id === floor)) m.floor = floor;
+    log('📍', `${m.code} verplaatst op de kaart (${get.floorName(m.campusId, m.floor)})`);
+    commit();
+    return { ok: true };
+  }
+
+  function updateMachine(machineId, data) {
+    const m = get.machine(machineId);
+    if (!m) return { ok: false };
+    if (data.location !== undefined) { const l = String(data.location).trim(); if (l.length < 2) return { ok: false, error: 'Locatie is te kort.' }; m.location = l.slice(0, 80); }
+    if (data.type && MACHINE_TYPES[data.type]) m.type = data.type;
+    commit();
+    return { ok: true };
+  }
+
+  function removeMachine(machineId) {
+    const m = get.machine(machineId);
+    if (!m) return { ok: false };
+    state.reservations.filter((r) => r.machineId === machineId && r.status === 'actief').forEach((r) => {
+      r.status = 'geannuleerd'; r.closedAt = Date.now(); r.fee = 0;
+      notify(r.userId, '↩️', `Automaat ${m.code} werd weggehaald. Je reservatie ${r.code} is gratis geannuleerd${r.paid ? ' en terugbetaald' : ''}.`);
+    });
+    state.reports.filter((r) => r.machineId === machineId && r.status !== 'opgelost').forEach((r) => { r.status = 'opgelost'; r.updatedAt = Date.now(); });
+    // niet echt wissen: oude reservaties/meldingen verwijzen er nog naar
+    m.removed = true; m.removedAt = Date.now();
+    log('🗑️', `Automaat ${m.code} verwijderd (${m.location})`);
+    commit();
+    return { ok: true };
+  }
+
   function simulateSales(count = 5) {
     const candidates = [];
-    state.machines.forEach((m) => { if (m.status !== 'defect') m.slots.forEach((s) => { if (available(m, s) > 0) candidates.push([m, s]); }); });
+    state.machines.forEach((m) => { if (m.status !== 'defect' && !m.removed) m.slots.forEach((s) => { if (available(m, s) > 0) candidates.push([m, s]); }); });
     let sold = 0;
     for (let i = 0; i < count && candidates.length; i++) {
       const [m, s] = candidates[Math.floor(Math.random() * candidates.length)];
@@ -681,12 +749,12 @@
     CONFIG, MACHINE_TYPES, CATEGORIES, TAGS, ISSUE_TYPES, REPORT_STATUS, SUGGESTION_STATUS, RESERVATION_STATUS, ROLES,
     get, subscribe, tick,
     util: { euro, esc, norm, timeAgo, clock, dateTime, duration },
-    derive: { reservedCount, available, fillPercent, emptySlots, lowSlots, machineState, distance, distanceLabel, matchProduct, matchingSlots, productStats },
+    derive: { freeCancelUntil, isFreeCancel, reservedCount, available, fillPercent, emptySlots, lowSlots, machineState, distance, distanceLabel, matchProduct, matchingSlots, productStats },
     auth: { currentUser, login, logout },
     actions: {
       reportIssue, reserve, cancelReservation, pickupReservation, addSuggestion, toggleVote, toggleFavorite, markNotificationsRead,
       setReportStatus, setMachineStatus, setSlotQty, refillSlot, refillMachine, setSlotProduct, addSlot, simulateSales,
-      setSuggestionStatus, saveProduct, resetDemo,
+      setSuggestionStatus, saveProduct, resetDemo, addMachine, moveMachine, updateMachine, removeMachine,
     },
   };
 })(window);

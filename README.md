@@ -82,25 +82,26 @@ Tip: maak de app smal met de gsm-weergave van de browser (F12 en dan Ctrl+Shift+
 **In de app (als student):**
 1. Bovenaan staan je **favorieten**, met hoeveel er nog beschikbaar zijn. Voeg er een toe met ☆ in de inhoud van een automaat.
 2. Zoek bijvoorbeeld "red bull". Je ziet welke automaten het op voorraad hebben, de dichtstbijzijnde eerst.
-3. Klik op **Kaart** en wissel tussen gelijkvloers, mezzanine en verdiep 1 tot 5. Tik op een lege plek om je eigen locatie te zetten.
+3. Klik bij een automaat op **Op kaart**, of kies bovenaan **Kaart** en wissel tussen gelijkvloers, mezzanine en verdiep 1 tot 5. Tik op een lege plek om je eigen locatie te zetten. Met de schakelaar **Enkel werkende** verberg of toon je defecte automaten.
 4. Open een automaat en **reserveer** een product. Het blijft 8 uur opzij en je krijgt een ophaalcode.
-5. Bij **Reservaties** kan je het product **ophalen** (de code intikken gebeurt gesimuleerd) of **annuleren** (dat kost € 0,50).
+5. Bij **Reservaties** kan je het product **ophalen** (de code intikken gebeurt gesimuleerd) of **annuleren** (gratis in de eerste 15 minuten, daarna € 0,50).
 6. **Meld een storing** of **stel een product voor** bij Ideeën.
 
 **In het dashboard (als vulploeg):**
 1. Bij **Overzicht** zie je wat aandacht nodig heeft.
 2. Bij **Meldingen** zet je een melding op *In behandeling* en daarna op *Opgelost*. De student krijgt daarover een bericht in de app (het belletje).
 3. Bij **Automaten** klik je op **Beheer** om voorraad aan te passen, bij te vullen of een automaat op *Defect* te zetten. Kijk daarna in de app: de automaat is meteen aangepast.
-4. **Bijvullijst** toont wat er in de bestelwagen moet.
-5. Linksonder staan demo-tools: **Simuleer 5 verkopen** en **Demo-data resetten**.
+4. Bij **Kaart** kies je **Verplaatsen** om een automaat naar zijn juiste plek te slepen, of **Automaat toevoegen** om er een bij te plaatsen.
+5. **Bijvullijst** toont wat er in de bestelwagen moet.
+6. Linksonder staan demo-tools: **Simuleer 5 verkopen** en **Demo-data resetten**.
 
 ## 5. Waar pas ik wat aan?
 
 | Ik wil… | Bestand |
 |---|---|
-| automaten toevoegen of verplaatsen op de kaart (`x` en `y` in % van het grondplan) | `vendo/shared/store.js` → `const machines` |
+| automaten toevoegen of verplaatsen op de kaart | in het dashboard: **Kaart → Verplaatsen / Automaat toevoegen**. Voor de demodata zelf: `vendo/shared/store.js` → `const machines` (`x` en `y` in % van het grondplan) |
 | producten of prijzen aanpassen | `vendo/shared/store.js` → `const products` (of via het dashboard) |
-| regels aanpassen (8 uur, € 0,50, max. 2 reservaties…) | `vendo/shared/store.js` → `CONFIG` bovenaan |
+| regels aanpassen (8 uur, € 0,50, 15 min gratis annuleren, max. 2 reservaties…) | `vendo/shared/store.js` → `CONFIG` bovenaan |
 | demo-gebruikers, meldingen of ideeën aanpassen | `vendo/shared/store.js` → `users`, `reports`, `suggestions` |
 | schermen van de app | `vendo/app/app.js` |
 | schermen van het dashboard | `vendo/dashboard/dashboard.js` |

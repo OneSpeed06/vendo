@@ -196,7 +196,7 @@
         <div class="relative">
           <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-brand-500"></i>
           <input id="searchInput" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" value="${esc(ui.query)}"
-            class="field py-2.5 pl-8 pr-9 text-sm" placeholder="Zoek product (bv. Red Bull, chips, vegan…)" aria-label="Zoek product">
+            class="field py-2.5 pl-8 pr-9 text-sm" placeholder="Zoek product (bv. Red Bull, chips, koffie…)" aria-label="Zoek product">
           <button id="clearSearch" onclick="App.clearSearch()" aria-label="Wis zoekopdracht" class="absolute right-2 top-1/2 hidden -translate-y-1/2 p-1.5 text-muted hover:text-ink"><i class="fa-solid fa-circle-xmark text-sm"></i></button>
         </div>
         <div id="discoverControls"></div>
@@ -245,11 +245,7 @@
           : '<span class="whitespace-nowrap text-[10px] text-muted">Tik op <i class="fa-regular fa-star"></i> bij een product om het hier te bewaren.</span>'}
       </div>` : ''}
       <div class="no-scrollbar flex items-center gap-1.5 overflow-x-auto">
-        ${TYPE_FILTERS.map((t) => `<button class="chip ${ui.type === t.id ? 'chip-active' : ''}" onclick="App.setType('${t.id}')">${t.icon} ${t.label}</button>`).join('')}
-      </div>
-      <div class="no-scrollbar flex items-center gap-1.5 overflow-x-auto">
-        ${['suikervrij', 'vegan', 'glutenvrij'].map((t) => `<button class="chip px-2.5 py-1 text-[10px] ${ui.tags.includes(t) ? 'chip-active' : ''}" onclick="App.toggleTag('${t}')" aria-pressed="${ui.tags.includes(t)}">${V.TAGS[t].icon} ${V.TAGS[t].label}</button>`).join('')}
-        <button class="chip px-2.5 py-1 text-[10px] ${ui.onlyWorking ? 'chip-active' : ''}" onclick="App.toggleWorking()" aria-pressed="${ui.onlyWorking}">✅ Enkel werkend</button>
+        ${TYPE_FILTERS.map((t) => `<button class="chip px-2.5 py-1 ${ui.type === t.id ? 'chip-active' : ''}" onclick="App.setType('${t.id}')">${t.icon} ${t.label}</button>`).join('')}
       </div>
       <div class="flex items-center justify-between gap-2 pt-0.5">
         <button onclick="App.openSheet('location')" class="flex min-w-0 items-center gap-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
@@ -267,10 +263,9 @@
     // ---- Lijstweergave ----
     let html = '';
     if (searching) {
-      html += productSummary(rows);
       const hits = rows.filter((r) => r.st.usable && r.inStock.length > 0);
       const misses = rows.filter((r) => r.matches.length > 0 && !(r.st.usable && r.inStock.length > 0));
-      html += `<p class="mb-2 mt-1 text-[11px] font-semibold text-muted">${hits.length ? `<span class="text-ink">${hits.length} ${hits.length === 1 ? 'automaat heeft' : 'automaten hebben'} het op voorraad</span> · dichtstbij eerst` : ''}</p>`;
+      html += summaryLine(hits.length ? `<span class="text-ink">${hits.length} ${hits.length === 1 ? 'automaat heeft' : 'automaten hebben'} het</span> · dichtstbij eerst` : 'Geen resultaten', false);
       if (!hits.length) html += emptyState(misses.length ? 'Nergens op voorraad op deze campus' : 'Niets gevonden', misses.length ? 'Het product zit wel in een automaat, maar is uitverkocht of de automaat is defect.' : 'Probeer een andere zoekterm of stel het product voor.', true);
       html += hits.map((r, i) => machineCard(r, { nearest: i === 0, searching })).join('');
       if (misses.length) {
@@ -279,36 +274,26 @@
         if (ui.showUnavailable) html += `<div class="mt-2 space-y-3 opacity-70">${misses.map((r) => machineCard(r, { searching })).join('')}</div>`;
       }
     } else {
-      const floors = campus.floors;
       let list = rows;
-      if (ui.floor !== 'all') list = list.filter((r) => r.m.floor === ui.floor);
       if (ui.onlyWorking) list = list.filter((r) => r.st.usable);
-      html += `<div class="no-scrollbar mb-2 flex items-center gap-1.5 overflow-x-auto">
-        <button class="chip px-2.5 py-1 text-[10px] ${ui.floor === 'all' ? 'chip-active' : ''}" onclick="App.setFloor('all')"><i class="fa-solid fa-layer-group"></i> Alle verdiepen</button>
-        ${floors.map((f) => `<button class="chip px-2.5 py-1 text-[10px] ${ui.floor === f.id ? 'chip-active' : ''}" onclick="App.setFloor(${f.id})">${esc(f.name)}</button>`).join('')}
-      </div>
-      <p class="mb-2 text-[11px] font-semibold text-muted">${list.length} ${list.length === 1 ? 'automaat' : 'automaten'} · dichtstbij eerst${ui.onlyWorking && rows.some((r) => !r.st.usable) ? ' · defecte verborgen' : ''}</p>`;
+      html += summaryLine(`${list.length} ${list.length === 1 ? 'automaat' : 'automaten'} · dichtstbij eerst`, true);
       if (!list.length) html += emptyState('Geen automaten', 'Geen automaten voor deze filters.', false);
       html += list.map((r, i) => machineCard(r, { nearest: i === 0 && r.dist !== null })).join('');
     }
     body.innerHTML = `<div class="space-y-3">${html}</div>`;
   }
 
-  function productSummary(rows) {
-    const map = new Map();
-    rows.forEach((r) => r.matches.forEach((x) => {
-      const e = map.get(x.product.id) || { p: x.product, avail: 0, machines: 0 };
-      if (r.st.usable && x.avail > 0) { e.avail += x.avail; e.machines++; }
-      map.set(x.product.id, e);
-    }));
-    const list = [...map.values()].sort((a, b) => b.avail - a.avail);
-    if (!list.length) return '';
-    return `<div class="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 pb-1">
-      ${list.map((e) => `<button onclick="App.setQuery(${esc(JSON.stringify(e.p.name))})" class="min-w-[140px] shrink-0 rounded-xl border ${e.avail ? 'border-line bg-card' : 'border-dashed border-line bg-transparent opacity-60'} p-2 text-left">
-        <div class="flex items-center justify-between"><span class="text-lg">${e.p.icon}</span><span class="text-[11px] font-extrabold">${euro(e.p.price)}</span></div>
-        <p class="mt-0.5 truncate text-[11px] font-bold">${esc(e.p.name)}</p>
-        <p class="text-[10px] ${e.avail ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'} font-semibold">${e.avail ? `${e.avail} st. in ${e.machines} ${e.machines === 1 ? 'automaat' : 'automaten'}` : 'Nergens beschikbaar'}</p>
-      </button>`).join('')}
+  /** Regel boven de resultaten, met de schakelaar "Enkel werkende" */
+  function summaryLine(text, withToggle) {
+    const hidden = V.get.machinesOfCampus(ui.campusId).filter((m) => !V.derive.machineState(m, 'app').usable).length;
+    return `<div class="mb-1 flex items-center justify-between gap-3">
+      <p class="text-[11px] font-semibold text-muted">${text}</p>
+      ${withToggle ? `<label class="flex shrink-0 cursor-pointer items-center gap-2 text-[11px] font-semibold text-muted">
+        Enkel werkende${ui.onlyWorking && hidden ? ` <span class="text-[10px] font-normal">(${hidden} verborgen)</span>` : ''}
+        <button type="button" role="switch" aria-checked="${ui.onlyWorking}" aria-label="Toon enkel werkende automaten" onclick="App.toggleWorking()"
+          class="relative h-5 w-9 rounded-full transition-colors ${ui.onlyWorking ? 'bg-emerald-500' : 'bg-line'}">
+          <span class="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${ui.onlyWorking ? 'left-[18px]' : 'left-0.5'}"></span>
+        </button></label>` : ''}
     </div>`;
   }
 
@@ -318,7 +303,7 @@
       <h3 class="text-sm font-bold">${esc(title)}</h3>
       <p class="mt-1 text-xs text-muted">${esc(text)}</p>
       <div class="mt-3 flex justify-center gap-2">
-        ${ui.query || ui.tags.length ? '<button onclick="App.clearSearch()" class="btn-ghost px-3 py-1.5 text-xs">Wis zoekopdracht</button>' : ''}
+        ${ui.query ? '<button onclick="App.clearSearch()" class="btn-ghost px-3 py-1.5 text-xs">Wis zoekopdracht</button>' : ''}
         ${suggest ? `<button onclick="App.openSheet('suggest', { name: ${esc(JSON.stringify(ui.query.trim()))} })" class="btn-primary px-3 py-1.5 text-xs"><i class="fa-solid fa-lightbulb"></i> Stel voor</button>` : ''}
       </div>
     </div>`;
@@ -351,22 +336,18 @@
     }
     return `
       <article class="card p-3 transition-colors hover:border-brand-500/50">
-        ${opts.nearest ? '<div class="mb-2 inline-flex items-center gap-1 rounded-lg bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400"><i class="fa-solid fa-person-walking"></i> Dichtstbij</div>' : ''}
         <div class="mb-2 flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <div class="mb-1 flex flex-wrap items-center gap-1">
-              ${U.badge(`${st.dot} ${st.label}`, st.color)}
-              ${U.badge(`${t.icon} ${t.label}`, 'slate')}
-            </div>
-            <h3 class="text-sm font-extrabold">Automaat ${esc(m.code)}</h3>
-            <p class="mt-0.5 text-[11px] text-muted"><i class="fa-solid fa-location-dot mr-1 text-[10px] text-brand-500"></i>${esc(V.get.floorName(m.campusId, m.floor))} · ${esc(m.location)}</p>
-            ${distTxt ? `<p class="mt-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400"><i class="fa-solid fa-person-walking mr-1"></i>${distTxt}</p>` : ''}
+            <h3 class="text-sm font-extrabold"><span title="${t.label}">${t.icon}</span> Automaat ${esc(m.code)}</h3>
+            <p class="mt-0.5 truncate text-[11px] text-muted">${esc(V.get.floorName(m.campusId, m.floor))} · ${esc(m.location)}</p>
+            ${distTxt ? `<p class="mt-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400"><i class="fa-solid fa-person-walking mr-1"></i>${opts.nearest ? 'Dichtstbij · ' : ''}${distTxt}</p>` : ''}
           </div>
+          ${U.badge(`${st.dot} ${st.short}`, st.color, 'shrink-0')}
         </div>
         ${middle}
-        <div class="grid grid-cols-[1fr_auto] gap-2 border-t border-line pt-2">
-          <button onclick="App.openSheet('machine', { id: '${m.id}' })" class="btn-primary py-2 text-[11px]"><i class="fa-solid fa-eye text-[10px]"></i> Bekijk inhoud</button>
-          <button onclick="App.openSheet('report', { machineId: '${m.id}' })" class="btn-ghost px-3 py-2 text-[11px] text-muted" aria-label="Meld storing voor ${esc(m.code)}"><i class="fa-solid fa-triangle-exclamation text-amber-500"></i> Defect</button>
+        <div class="grid ${opts.inMap ? 'grid-cols-1' : 'grid-cols-[1fr_auto]'} gap-2">
+          <button onclick="App.openSheet('machine', { id: '${m.id}' })" class="btn-primary py-2 text-[11px]">Bekijk inhoud</button>
+          ${opts.inMap ? '' : `<button onclick="App.showOnMap('${m.id}')" class="btn-ghost px-3 py-2 text-[11px]" aria-label="Toon ${esc(m.code)} op de kaart"><i class="fa-solid fa-map-location-dot text-brand-500"></i> Op kaart</button>`}
         </div>
       </article>`;
   }
@@ -385,6 +366,7 @@
           ${f.id === pos.floor ? '<i class="fa-solid fa-location-crosshairs"></i>' : ''} ${esc(f.name)}
           <span class="ml-0.5 rounded-full ${ui.mapFloor === f.id ? 'bg-white/25' : 'bg-line'} px-1.5 text-[9px]">${counts[f.id] || 0}</span></button>`).join('')}
       </div>
+      ${searching ? '' : summaryLine(`${floorRows.filter(isHit).length} op ${esc(V.get.floorName(ui.campusId, ui.mapFloor))}`, true)}
       <div id="floorplan"></div>
       <p class="mt-1.5 text-center text-[10px] text-muted"><i class="fa-solid fa-hand-pointer mr-1"></i>Tik op een automaat voor details · tik op een lege plek om je locatie te zetten</p>
       <div id="pinCard" class="mt-2"></div>`;
@@ -399,7 +381,7 @@
     let sel = floorRows.find((r) => r.m.id === ui.selectedPin);
     if (!sel) sel = floorRows.filter(isHit).sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9))[0];
     const card = $('#pinCard');
-    if (sel) card.innerHTML = machineCard(sel, { searching });
+    if (sel) card.innerHTML = machineCard(sel, { searching, inMap: true });
     else if (searching && Object.keys(counts).length) {
       const other = campus.floors.filter((f) => counts[f.id]);
       card.innerHTML = `<div class="card p-3 text-center text-xs text-muted">Niets op dit verdiep. Wel op: ${other.map((f) => `<button class="font-bold text-brand-500 underline" onclick="App.setMapFloor(${f.id})">${esc(f.name)}</button>`).join(', ')}</div>`;
@@ -418,7 +400,7 @@
       <div class="space-y-4 p-3 pb-6">
         <div>
           <h2 class="text-base font-extrabold">Mijn reservaties</h2>
-          <p class="text-xs text-muted">Een reservatie houdt je product ${V.util.duration(V.CONFIG.reservationMinutes)} opzij. Annuleren of niet ophalen kost ${euro(V.CONFIG.cancelFee)}.</p>
+          <p class="text-xs text-muted">Een reservatie houdt je product ${V.util.duration(V.CONFIG.reservationMinutes)} opzij. Annuleren is gratis tijdens de eerste ${V.CONFIG.freeCancelMinutes} minuten, daarna (of niet ophalen) kost het ${euro(V.CONFIG.cancelFee)}.</p>
         </div>
         ${active.length ? active.map(activeResCard).join('') : `
           <div class="card px-4 py-8 text-center">
@@ -455,7 +437,7 @@
       </div>
       <div class="grid grid-cols-[1fr_auto] gap-2 p-3">
         <button onclick="App.openSheet('pickup', { id: '${r.id}' })" class="btn-primary py-2 text-xs"><i class="fa-solid fa-hand-holding"></i> Ophalen aan automaat</button>
-        <button onclick="App.openSheet('cancel', { id: '${r.id}' })" class="btn-ghost px-3 py-2 text-xs text-muted">Annuleer</button>
+        <button onclick="App.openSheet('cancel', { id: '${r.id}' })" class="btn-ghost px-3 py-2 text-xs text-muted">Annuleer${V.derive.isFreeCancel(r) ? ' <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">gratis nog <span data-countdown="' + V.derive.freeCancelUntil(r) + '" data-short>--</span></span>' : ''}</button>
       </div>
     </article>`;
   }
@@ -597,7 +579,6 @@
       const open = V.get.openReports(m.id);
       const q = ui.query.trim();
       let items = m.slots.map((sl) => ({ sl, p: V.get.product(sl.productId), a: V.derive.available(m, sl), r: V.derive.reservedCount(m.id, sl.code) }));
-      if (ui.sheetTag !== 'all') items = items.filter((x) => x.p.tags.includes(ui.sheetTag));
       const dist = V.derive.distanceLabel(me(), m);
       return `
         <div class="mb-2 flex flex-wrap gap-1">${U.badge(`${st.dot} ${st.label}`, st.color)}${U.badge(`${t.icon} ${t.label}`, 'slate')}</div>
@@ -606,10 +587,6 @@
         ${st.key === 'defect' ? `<div class="mb-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs font-semibold text-rose-600 dark:text-rose-400"><i class="fa-solid fa-ban mr-1"></i> Deze automaat is defect. De vulploeg is op de hoogte. Reserveren kan niet.</div>` : ''}
         ${st.key !== 'defect' && open.length ? `<div class="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400"><p class="font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Storing gemeld door andere gebruikers</p><p class="mt-0.5">${open.map((r) => esc(V.ISSUE_TYPES[r.issue].label)).join(' · ')}</p></div>` : ''}
         <p class="mb-3 text-[11px] text-muted"><i class="fa-solid fa-truck-ramp-box mr-1"></i>Laatst bijgevuld ${timeAgo(m.lastRefill)} · voorraad wordt live bijgewerkt</p>
-        <div class="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto">
-          <button onclick="App.setSheetTag('all')" class="chip px-2.5 py-1 text-[10px] ${ui.sheetTag === 'all' ? 'chip-active' : ''}">Alles</button>
-          ${Object.entries(V.TAGS).map(([k, v]) => `<button onclick="App.setSheetTag('${k}')" class="chip px-2.5 py-1 text-[10px] ${ui.sheetTag === k ? 'chip-active' : ''}">${v.icon} ${v.label}</button>`).join('')}
-        </div>
         <div class="mb-2 flex items-center justify-between"><h3 class="text-xs font-bold uppercase tracking-wider">Inhoud & prijzen</h3><span class="text-[10px] text-muted">${items.length} producten</span></div>
         <div class="grid grid-cols-2 gap-2">
           ${items.length ? items.map(({ sl, p, a, r }) => {
@@ -620,7 +597,6 @@
                   <span class="flex items-center gap-1.5"><span class="text-xs font-extrabold">${euro(p.price)}</span>
                   <button onclick="App.toggleFav('${p.id}')" aria-pressed="${(user().favorites || []).includes(p.id)}" aria-label="${(user().favorites || []).includes(p.id) ? 'Verwijder uit' : 'Bewaar als'} favoriet" class="p-0.5 text-sm ${(user().favorites || []).includes(p.id) ? 'text-amber-400' : 'text-muted hover:text-amber-400'}"><i class="fa-${(user().favorites || []).includes(p.id) ? 'solid' : 'regular'} fa-star"></i></button></span></div>
                 <h4 class="mt-1 text-xs font-bold leading-tight">${esc(p.name)}</h4>
-                <div class="mt-1 flex flex-wrap gap-1">${p.tags.map((tg) => `<span class="rounded border border-line bg-card px-1 text-[9px] text-muted">${V.TAGS[tg]?.icon || ''} ${esc(V.TAGS[tg]?.label || tg)}</span>`).join('')}</div>
               </div>
               <div class="mt-2 border-t border-line pt-1.5">
                 <div class="flex items-center justify-between text-[10px]"><span class="text-muted">Vak ${esc(sl.code)}</span><span class="font-bold ${a > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}">${a > 0 ? `${a} beschikbaar` : 'Uitverkocht'}</span></div>
@@ -652,7 +628,7 @@
           <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-sub p-3 has-[:checked]:border-brand-500">
             <input type="radio" name="pay" value="now" class="accent-brand-500"><span class="text-xs"><b>Nu online betalen</b> <span class="badge border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400">demo</span><br><span class="text-muted">Code intikken en het product valt meteen. Niet opgehaald? Terugbetaling.</span></span></label>
         </fieldset>
-        <p class="mt-3 flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-800 dark:text-amber-300"><i class="fa-solid fa-circle-info mt-0.5"></i><span>Het product wordt voor jou opzijgelegd. <b>Annuleer je of haal je het niet op binnen ${V.util.duration(V.CONFIG.reservationMinutes)}, dan betaal je ${euro(V.CONFIG.cancelFee)}.</b></span></p>
+        <p class="mt-3 flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-800 dark:text-amber-300"><i class="fa-solid fa-circle-info mt-0.5"></i><span>Het product wordt voor jou opzijgelegd. Van gedachten veranderd? <b>Annuleren is gratis tijdens de eerste ${V.CONFIG.freeCancelMinutes} minuten.</b> Daarna, of als je het niet ophaalt binnen ${V.util.duration(V.CONFIG.reservationMinutes)}, betaal je ${euro(V.CONFIG.cancelFee)}.</span></p>
         <button ${a > 0 ? '' : 'disabled'} onclick="App.confirmReserve('${m.id}', '${sl.code}')" class="btn-primary mt-4 w-full py-3 text-sm"><i class="fa-solid fa-bookmark"></i> Reserveer voor ${euro(p.price)}</button>
         <button onclick="App.openSheet('machine', { id: '${m.id}' })" class="mt-2 w-full py-2 text-xs font-semibold text-muted">Terug naar automaat</button>`;
     },
@@ -706,17 +682,19 @@
       const r = V.get.state().reservations.find((x) => x.id === s.id);
       if (!r || r.status !== 'actief') return `${sheetHeader('Reservatie annuleren', '')}<p class="text-sm text-muted">Deze reservatie is niet meer actief.</p>`;
       const p = V.get.product(r.productId), m = V.get.machine(r.machineId);
-      const fee = V.CONFIG.cancelFee;
+      const free = V.derive.isFreeCancel(r);
+      const fee = free ? 0 : V.CONFIG.cancelFee;
       return `${sheetHeader('Reservatie annuleren?', `${p.icon} ${esc(p.name)} in ${esc(m.code)}`)}
         <div class="space-y-2 rounded-2xl border border-line bg-sub p-3 text-sm">
-          <div class="flex justify-between"><span class="text-muted">Annulatiekost (product lag opzij)</span><b>${euro(fee)}</b></div>
+          ${free ? `<p class="flex items-start gap-2 font-semibold text-emerald-600 dark:text-emerald-400"><i class="fa-solid fa-circle-check mt-1"></i><span>Gratis: je reservatie is jonger dan ${V.CONFIG.freeCancelMinutes} minuten. Nog <span class="tabular-nums" data-countdown="${V.derive.freeCancelUntil(r)}" data-short>--</span> om gratis te annuleren.</span></p>` : ''}
+          <div class="flex justify-between"><span class="text-muted">Annulatiekost${free ? '' : ' (product lag opzij)'}</span><b>${euro(fee)}</b></div>
           ${r.paid ? `<div class="flex justify-between"><span class="text-muted">Al betaald</span><span>${euro(r.price)}</span></div>
           <div class="flex justify-between border-t border-line pt-2"><span class="font-semibold">Je krijgt terug</span><b class="text-emerald-600 dark:text-emerald-400">${euro(r.price - fee)}</b></div>`
-          : `<p class="text-[11px] text-muted">De ${euro(fee)} wordt aangerekend op je KdG-account (demo).</p>`}
+          : (fee ? `<p class="text-[11px] text-muted">De ${euro(fee)} wordt aangerekend op je KdG-account (demo).</p>` : '')}
         </div>
         <div class="mt-4 grid grid-cols-2 gap-2">
           <button onclick="App.closeSheet()" class="btn-ghost py-2.5 text-xs">Toch houden</button>
-          <button onclick="App.cancelReservation('${r.id}')" class="btn-danger py-2.5 text-xs">Annuleer voor ${euro(fee)}</button>
+          <button onclick="App.cancelReservation('${r.id}')" class="btn-danger py-2.5 text-xs">${fee ? `Annuleer voor ${euro(fee)}` : 'Gratis annuleren'}</button>
         </div>`;
     },
 
@@ -867,6 +845,11 @@
       const left = Math.max(0, Number(el.dataset.countdown) - Date.now());
       if (left === 0) expired = true;
       const hh = Math.floor(left / 3600000), mm = Math.floor((left % 3600000) / 60000), ss = Math.floor((left % 60000) / 1000);
+      if (el.hasAttribute('data-short')) {
+        el.textContent = `${Math.floor(left / 60000)}:${String(ss).padStart(2, '0')}`;
+        if (left === 0 && !el.dataset.done) { el.dataset.done = '1'; setTimeout(() => { renderTab(); if (ui.sheet && ui.sheet.kind === 'cancel') { renderSheet(); } }, 0); }
+        return;
+      }
       el.textContent = [hh, mm, ss].map((n) => String(n).padStart(2, '0')).join(':');
       el.classList.toggle('text-rose-500', left < 15 * 60000);
     });
@@ -885,13 +868,17 @@
     setQuery(q) { ui.query = q; ui.selectedPin = null; const i = $('#searchInput'); if (i) i.value = q; renderDiscoverBody(); },
     clearSearch() { ui.query = ''; ui.tags = []; ui.selectedPin = null; const i = $('#searchInput'); if (i) i.value = ''; renderDiscoverBody(); },
     setType(t) { ui.type = t; ui.selectedPin = null; renderDiscoverBody(); },
-    toggleTag(t) { ui.tags = ui.tags.includes(t) ? ui.tags.filter((x) => x !== t) : [...ui.tags, t]; renderDiscoverBody(); },
     toggleWorking() { ui.onlyWorking = !ui.onlyWorking; renderDiscoverBody(); },
     toggleUnavailable() { ui.showUnavailable = !ui.showUnavailable; renderDiscoverBody(); },
     setView(v) { ui.view = v; writePref(PREF.view, v); renderDiscoverBody(); },
-    setFloor(f) { ui.floor = f; renderDiscoverBody(); },
+    showOnMap(id) {
+      const m = V.get.machine(id);
+      ui.view = 'map'; ui.mapFloor = m.floor; ui.selectedPin = id; writePref(PREF.view, 'map');
+      ui.sheet = null; renderSheet();
+      renderDiscoverBody();
+      const v = $('#view'); if (v) v.scrollTop = 0;
+    },
     setMapFloor(f) { ui.mapFloor = f; ui.selectedPin = null; renderDiscoverBody(); },
-    setSheetTag(t) { ui.sheetTag = t; renderSheet(); },
     openSheet, closeSheet,
     locFloor(f) { ui.sheet.floor = f; renderSheet(); wireSheet(); },
     confirmReserve(machineId, slot) {
@@ -904,7 +891,8 @@
       const res = V.actions.cancelReservation(id, user().id);
       closeSheet();
       if (!res.ok) return U.toast(res.error, 'error');
-      U.toast(res.paid ? `Geannuleerd: ${euro(res.refund)} terugbetaald (${euro(res.fee)} kost)` : `Geannuleerd: ${euro(res.fee)} annulatiekost`);
+      if (!res.fee) U.toast(res.paid ? `Gratis geannuleerd, ${euro(res.refund)} terugbetaald` : 'Gratis geannuleerd');
+      else U.toast(res.paid ? `Geannuleerd: ${euro(res.refund)} terugbetaald (${euro(res.fee)} kost)` : `Geannuleerd: ${euro(res.fee)} annulatiekost`);
     },
     toggleFav(pid) {
       const r = V.actions.toggleFavorite(user().id, pid);
