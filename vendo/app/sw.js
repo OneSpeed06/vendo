@@ -1,6 +1,6 @@
 /* Vendo service worker: app-shell offline beschikbaar (network-first met offline-cache),
  * nieuwe versie? Verhoog CACHE. */
-const CACHE = 'vendo-app-v2';
+const CACHE = 'vendo-app-v3';
 const SHELL = [
   './', './index.html', './app.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png',
   '../shared/store.js', '../shared/ui.js', '../shared/vendo.css',

@@ -76,16 +76,20 @@
   }
 
   // ---------- Logo ----------
-  const logo = (cls = 'w-9 h-9') => `
-    <div class="${cls} shrink-0 rounded-xl bg-slate-900 border border-brand-500/40 flex items-center justify-center p-1 shadow-lg shadow-brand-500/20">
-      <svg class="w-full h-full" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-        <path d="M20 37C20 37 33 25.5 33 14C33 6.82 27.18 1 20 1C12.82 1 7 6.82 7 14C7 25.5 20 37 20 37Z" fill="url(#vg)" stroke="#FF6B00" stroke-width="1.5"/>
-        <path d="M12 11L20 23L28 11H23.5L20 16.5L16.5 11H12Z" fill="#0B0F19"/>
-        <rect x="14" y="22" width="12" height="2.5" rx="1.25" fill="#FF6B00"/>
-        <circle cx="20" cy="7.5" r="2.2" fill="#10B981"/>
-        <defs><linearGradient id="vg" x1="7" y1="1" x2="33" y2="37" gradientUnits="userSpaceOnUse"><stop stop-color="#FF6B00"/><stop offset="1" stop-color="#F59E0B"/></linearGradient></defs>
-      </svg>
-    </div>`;
+  // Een automaat van voren: scherm met "V" en een uitgifteschuif.
+  // Volle oranje tegel met wit erop: werkt even goed op een lichte als op een donkere achtergrond.
+  let logoSeq = 0;
+  const logoSvg = (cls = 'w-full h-full') => {
+    const id = 'vlogo' + (++logoSeq);
+    return `<svg class="${cls}" viewBox="0 0 40 40" fill="none" role="img" aria-label="Vendo">
+      <defs><linearGradient id="${id}" x1="6" y1="2" x2="34" y2="38" gradientUnits="userSpaceOnUse"><stop stop-color="#FF8A1F"/><stop offset="1" stop-color="#F25C05"/></linearGradient></defs>
+      <rect x="1" y="1" width="38" height="38" rx="11" fill="url(#${id})"/>
+      <rect x="9" y="8" width="22" height="24" rx="4.5" stroke="#fff" stroke-width="2.6"/>
+      <path d="M14.5 13.5L20 22L25.5 13.5" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="15" y="26" width="10" height="2.4" rx="1.2" fill="#fff"/>
+    </svg>`;
+  };
+  const logo = (cls = 'w-9 h-9') => `<div class="${cls} shrink-0 drop-shadow-sm">${logoSvg()}</div>`;
 
   // ---------- Plattegrond ----------
   /**
@@ -176,5 +180,5 @@
     }
   }
 
-  global.VendoUI = { tone, badge, fillBar, fillColor, toast, initTheme, toggleTheme, applyTheme, logo, renderFloorplan };
+  global.VendoUI = { tone, badge, fillBar, fillColor, toast, initTheme, toggleTheme, applyTheme, logo, logoSvg, renderFloorplan };
 })(window);

@@ -36,10 +36,10 @@
   if (!V.get.campus(ui.campusId)) ui.campusId = V.get.state().campuses[0].id;
 
   const TYPE_FILTERS = [
-    { id: 'all', label: 'Alles', icon: '<i class="fa-solid fa-border-all"></i>' },
-    { id: 'drank', label: 'Drank', icon: '🥤', cats: ['drank'] },
-    { id: 'snack', label: 'Snacks', icon: '🍫', cats: ['snack', 'gezond'] },
-    { id: 'koffie', label: 'Koffie & warm', icon: '☕', cats: ['koffie'] },
+    { id: 'all', label: 'Alles', short: 'Alles', icon: '' },
+    { id: 'drank', label: 'Drank', short: 'Drank', icon: '🥤', cats: ['drank'] },
+    { id: 'snack', label: 'Snacks', short: 'Snacks', icon: '🍫', cats: ['snack', 'gezond'] },
+    { id: 'koffie', label: 'Koffie & warm', short: 'Warm', icon: '☕', cats: ['koffie'] },
   ];
 
   // ---------- Positie van de gebruiker ----------
@@ -193,11 +193,14 @@
   function renderDiscoverFrame() {
     $('#view').innerHTML = `
       <div class="sticky top-0 z-20 space-y-2 border-b border-line bg-bg/95 px-3 pb-2 pt-3 backdrop-blur">
-        <div class="relative">
-          <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-brand-500"></i>
-          <input id="searchInput" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" value="${esc(ui.query)}"
-            class="field py-2.5 pl-8 pr-9 text-sm" placeholder="Zoek product (bv. Red Bull, chips, koffie…)" aria-label="Zoek product">
-          <button id="clearSearch" onclick="App.clearSearch()" aria-label="Wis zoekopdracht" class="absolute right-2 top-1/2 hidden -translate-y-1/2 p-1.5 text-muted hover:text-ink"><i class="fa-solid fa-circle-xmark text-sm"></i></button>
+        <div class="flex items-center gap-2">
+          <div class="relative min-w-0 flex-1">
+            <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-brand-500"></i>
+            <input id="searchInput" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" value="${esc(ui.query)}"
+              class="field py-2.5 pl-8 pr-9 text-sm" placeholder="Zoek een product…" aria-label="Zoek product">
+            <button id="clearSearch" onclick="App.clearSearch()" aria-label="Wis zoekopdracht" class="absolute right-2 top-1/2 hidden -translate-y-1/2 p-1.5 text-muted hover:text-ink"><i class="fa-solid fa-circle-xmark text-sm"></i></button>
+          </div>
+          <div id="viewToggle" class="flex shrink-0 rounded-xl border border-line bg-sub p-0.5" role="tablist" aria-label="Weergave"></div>
         </div>
         <div id="discoverControls"></div>
       </div>
@@ -237,35 +240,26 @@
     // ---- Filters ----
     const favs = (user().favorites || []).map((id) => V.get.product(id)).filter(Boolean);
     const favAvail = (p) => rows.reduce((a, r) => a + (r.st.usable ? r.m.slots.filter((sl) => sl.productId === p.id).reduce((b, sl) => b + V.derive.available(r.m, sl), 0) : 0), 0);
+    // Type automaat: één rustige gesegmenteerde balk
     $('#discoverControls').innerHTML = `
-      ${!searching ? `<div class="no-scrollbar flex items-center gap-1.5 overflow-x-auto">
-        <span class="whitespace-nowrap text-[9px] font-bold uppercase tracking-wider text-muted"><i class="fa-solid fa-star text-amber-400"></i> Favorieten:</span>
-        ${favs.length ? favs.map((p) => { const n = favAvail(p);
-          return `<button class="chip px-2.5 py-1 text-[10px] ${n ? '' : 'opacity-60'}" onclick="App.setQuery(${esc(JSON.stringify(p.name))})">${p.icon} ${esc(p.name.replace(/\s\d+cl$/, ''))} <span class="rounded-full ${n ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-500'} px-1.5 text-[9px] font-bold">${n || 'op'}</span></button>`; }).join('')
-          : '<span class="whitespace-nowrap text-[10px] text-muted">Tik op <i class="fa-regular fa-star"></i> bij een product om het hier te bewaren.</span>'}
-      </div>` : ''}
-      <div class="no-scrollbar flex items-center gap-1.5 overflow-x-auto">
-        ${TYPE_FILTERS.map((t) => `<button class="chip px-2.5 py-1 ${ui.type === t.id ? 'chip-active' : ''}" onclick="App.setType('${t.id}')">${t.icon} ${t.label}</button>`).join('')}
-      </div>
-      <div class="flex items-center justify-between gap-2 pt-0.5">
-        <button onclick="App.openSheet('location')" class="flex min-w-0 items-center gap-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-          <i class="fa-solid fa-location-crosshairs"></i><span class="truncate">Ik ben: ${esc(V.get.floorName(ui.campusId, pos.floor))}${pos.set ? '' : ' (ingang)'}</span>
-        </button>
-        <div class="flex shrink-0 items-center rounded-xl border border-line bg-sub p-0.5 text-[11px] font-bold" role="tablist">
-          <button role="tab" aria-selected="${ui.view === 'list'}" onclick="App.setView('list')" class="flex items-center gap-1 rounded-lg px-2.5 py-1 ${ui.view === 'list' ? 'bg-brand-500 text-white' : 'text-muted'}"><i class="fa-solid fa-list-ul text-[10px]"></i>Lijst</button>
-          <button role="tab" aria-selected="${ui.view === 'map'}" onclick="App.setView('map')" class="flex items-center gap-1 rounded-lg px-2.5 py-1 ${ui.view === 'map' ? 'bg-brand-500 text-white' : 'text-muted'}"><i class="fa-solid fa-map-location-dot text-[10px]"></i>Kaart</button>
-        </div>
+      <div class="grid grid-cols-4 rounded-xl border border-line bg-sub p-0.5 text-[11px] font-semibold" role="radiogroup" aria-label="Soort automaat">
+        ${TYPE_FILTERS.map((t) => `<button role="radio" aria-checked="${ui.type === t.id}" onclick="App.setType('${t.id}')"
+          class="flex items-center justify-center gap-1 rounded-lg py-1.5 transition-colors ${ui.type === t.id ? 'bg-card text-ink shadow-sm' : 'text-muted hover:text-ink'}">
+          <span class="${t.id === 'all' ? 'hidden' : ''}">${t.icon}</span>${t.short}</button>`).join('')}
       </div>`;
+    $('#viewToggle').innerHTML = [['list', 'fa-list-ul', 'Lijst'], ['map', 'fa-map', 'Kaart']].map(([id, icon, label]) => `
+      <button role="tab" aria-selected="${ui.view === id}" aria-label="${label}" title="${label}" onclick="App.setView('${id}')"
+        class="flex h-9 w-9 items-center justify-center rounded-lg text-sm ${ui.view === id ? 'bg-brand-500 text-white' : 'text-muted hover:text-ink'}"><i class="fa-solid ${icon}"></i></button>`).join('');
 
     const body = $('#discoverBody');
     if (ui.view === 'map') { renderMapView(body, rows, searching, pos, campus); return; }
 
     // ---- Lijstweergave ----
-    let html = '';
+    let html = searching ? '' : favoritesStrip(favs, favAvail);
     if (searching) {
       const hits = rows.filter((r) => r.st.usable && r.inStock.length > 0);
       const misses = rows.filter((r) => r.matches.length > 0 && !(r.st.usable && r.inStock.length > 0));
-      html += summaryLine(hits.length ? `<span class="text-ink">${hits.length} ${hits.length === 1 ? 'automaat heeft' : 'automaten hebben'} het</span> · dichtstbij eerst` : 'Geen resultaten', false);
+      html += summaryLine(hits.length ? `<span class="text-ink">${hits.length} ${hits.length === 1 ? 'automaat heeft' : 'automaten hebben'} het</span>` : 'Geen resultaten', false);
       if (!hits.length) html += emptyState(misses.length ? 'Nergens op voorraad op deze campus' : 'Niets gevonden', misses.length ? 'Het product zit wel in een automaat, maar is uitverkocht of de automaat is defect.' : 'Probeer een andere zoekterm of stel het product voor.', true);
       html += hits.map((r, i) => machineCard(r, { nearest: i === 0, searching })).join('');
       if (misses.length) {
@@ -276,7 +270,7 @@
     } else {
       let list = rows;
       if (ui.onlyWorking) list = list.filter((r) => r.st.usable);
-      html += summaryLine(`${list.length} ${list.length === 1 ? 'automaat' : 'automaten'} · dichtstbij eerst`, true);
+      html += summaryLine(`${list.length} ${list.length === 1 ? 'automaat' : 'automaten'}`, true);
       if (!list.length) html += emptyState('Geen automaten', 'Geen automaten voor deze filters.', false);
       html += list.map((r, i) => machineCard(r, { nearest: i === 0 && r.dist !== null })).join('');
     }
@@ -284,12 +278,31 @@
   }
 
   /** Regel boven de resultaten, met de schakelaar "Enkel werkende" */
-  function summaryLine(text, withToggle) {
-    const hidden = V.get.machinesOfCampus(ui.campusId).filter((m) => !V.derive.machineState(m, 'app').usable).length;
+  /** Favorieten: compacte kaartjes bovenaan de lijst (niet in de vaste balk) */
+  function favoritesStrip(favs, favAvail) {
+    if (!favs.length) {
+      return `<p class="flex items-center gap-2 text-[11px] text-muted"><i class="fa-regular fa-star text-amber-400"></i>Tip: tik op de ster bij een product om het als favoriet te bewaren.</p>`;
+    }
+    return `<section aria-label="Favorieten">
+      <h2 class="mb-1.5 text-[11px] font-bold text-muted"><i class="fa-solid fa-star mr-1 text-amber-400"></i>Favorieten</h2>
+      <div class="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3">
+        ${favs.map((p) => { const n = favAvail(p);
+          return `<button onclick="App.setQuery(${esc(JSON.stringify(p.name))})" class="flex shrink-0 items-center gap-2 rounded-xl border border-line bg-card py-1.5 pl-2 pr-2.5 text-left hover:border-brand-500/50">
+            <span class="text-lg leading-none">${p.icon}</span>
+            <span><span class="block text-[11px] font-bold leading-tight">${esc(p.name.replace(/\s\d+cl$/, ''))}</span>
+            <span class="block text-[10px] font-semibold ${n ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}">${n ? `${n} beschikbaar` : 'Uitverkocht'}</span></span>
+          </button>`; }).join('')}
+      </div>
+    </section>`;
+  }
+
+  /** Regel boven de resultaten: aantal + eigen locatie, met de schakelaar "Enkel werkende" */
+  function summaryLine(text, withToggle, showLocation = true) {
+    const pos = me();
     return `<div class="mb-1 flex items-center justify-between gap-3">
-      <p class="text-[11px] font-semibold text-muted">${text}</p>
+      <p class="min-w-0 text-[11px] font-semibold text-muted">${text}${showLocation ? ` · vanaf <button onclick="App.openSheet('location')" class="font-semibold text-blue-600 hover:underline dark:text-blue-400" aria-label="Wijzig je locatie"><i class="fa-solid fa-location-crosshairs mr-0.5"></i>${esc(V.get.floorName(ui.campusId, pos.floor))}${pos.set ? '' : ' (ingang)'}</button>` : ''}</p>
       ${withToggle ? `<label class="flex shrink-0 cursor-pointer items-center gap-2 text-[11px] font-semibold text-muted">
-        Enkel werkende${ui.onlyWorking && hidden ? ` <span class="text-[10px] font-normal">(${hidden} verborgen)</span>` : ''}
+        Enkel werkende
         <button type="button" role="switch" aria-checked="${ui.onlyWorking}" aria-label="Toon enkel werkende automaten" onclick="App.toggleWorking()"
           class="relative h-5 w-9 rounded-full transition-colors ${ui.onlyWorking ? 'bg-emerald-500' : 'bg-line'}">
           <span class="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${ui.onlyWorking ? 'left-[18px]' : 'left-0.5'}"></span>
@@ -366,7 +379,7 @@
           ${f.id === pos.floor ? '<i class="fa-solid fa-location-crosshairs"></i>' : ''} ${esc(f.name)}
           <span class="ml-0.5 rounded-full ${ui.mapFloor === f.id ? 'bg-white/25' : 'bg-line'} px-1.5 text-[9px]">${counts[f.id] || 0}</span></button>`).join('')}
       </div>
-      ${searching ? '' : summaryLine(`${floorRows.filter(isHit).length} op ${esc(V.get.floorName(ui.campusId, ui.mapFloor))}`, true)}
+      ${searching ? '' : summaryLine(`${floorRows.filter(isHit).length} ${floorRows.filter(isHit).length === 1 ? 'automaat' : 'automaten'} op dit verdiep`, true, false)}
       <div id="floorplan"></div>
       <p class="mt-1.5 text-center text-[10px] text-muted"><i class="fa-solid fa-hand-pointer mr-1"></i>Tik op een automaat voor details · tik op een lege plek om je locatie te zetten</p>
       <div id="pinCard" class="mt-2"></div>`;
